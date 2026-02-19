@@ -11,10 +11,15 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
   run-scrapers:
     name: Run Scrapy Spiders
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:

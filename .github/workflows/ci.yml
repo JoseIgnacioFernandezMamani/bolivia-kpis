@@ -6,11 +6,16 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   # ── Backend tests ─────────────────────────────────────────────────────────
   backend-test:
     name: Backend Tests (Python)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:
@@ -69,6 +74,8 @@ jobs:
   frontend-test:
     name: Frontend Build (Next.js)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +106,8 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [backend-test, frontend-test]
 
     steps:
@@ -131,6 +140,8 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: [docker-build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
