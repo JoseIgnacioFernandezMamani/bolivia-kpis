@@ -111,15 +111,16 @@ CREATE TABLE IF NOT EXISTS election_results (
     year          INTEGER NOT NULL,
     election_type VARCHAR(100) NOT NULL,
     department_id INTEGER REFERENCES departments(id),
-    party         VARCHAR(200),
-    candidate     VARCHAR(200),
+    party         VARCHAR(200) NOT NULL DEFAULT '',
+    candidate     VARCHAR(200) NOT NULL DEFAULT '',
     votes         INTEGER,
     percentage    DOUBLE PRECISION,
     geometry      geography(POLYGON, 4326),
     source        VARCHAR(512),
     last_updated  TIMESTAMPTZ,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_election_results UNIQUE (year, election_type, party, candidate)
 );
 CREATE INDEX IF NOT EXISTS idx_elections_year       ON election_results(year);
 CREATE INDEX IF NOT EXISTS idx_elections_department ON election_results(department_id);

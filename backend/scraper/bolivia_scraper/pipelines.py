@@ -123,7 +123,7 @@ class DatabasePipeline:
                     INSERT INTO election_results
                         (year, election_type, party, candidate, votes, percentage, source, last_updated)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (year, election_type, party, candidate)
+                    ON CONFLICT ON CONSTRAINT uq_election_results
                     DO UPDATE SET
                         votes        = EXCLUDED.votes,
                         percentage   = EXCLUDED.percentage,
@@ -133,8 +133,8 @@ class DatabasePipeline:
                     (
                         item.get("year"),
                         item.get("election_type"),
-                        item.get("party"),
-                        item.get("candidate"),
+                        item.get("party") or "",
+                        item.get("candidate") or "",
                         item.get("votes"),
                         item.get("percentage"),
                         item.get("source_url"),

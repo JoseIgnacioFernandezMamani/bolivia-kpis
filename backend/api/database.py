@@ -39,6 +39,6 @@ async def get_db() -> AsyncSession:
 async def init_db() -> None:
     """Create all tables (development only – use the SQL migration files in
     database/migrations/ for production deployments)."""
-    from models import base  # noqa: F401 – registers all models
+    import models  # noqa: F401 – importing the package registers all models via __init__
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

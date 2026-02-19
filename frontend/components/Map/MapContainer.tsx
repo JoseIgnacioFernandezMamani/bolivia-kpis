@@ -138,7 +138,7 @@ export default function MapContainer({ activeLayers }: Props) {
         onViewStateChange={({ viewState: vs }) => setViewState(vs as typeof INITIAL_VIEW_STATE)}
         controller
         layers={deckLayers}
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+        style={{ position: 'absolute', inset: 0 }}
         views={new MapView({ repeat: true })}
       />
 
