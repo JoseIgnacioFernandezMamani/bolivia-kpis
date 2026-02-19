@@ -1,11 +1,3 @@
-import sys
-import os
-
-# Ensure the auth package (backend/auth) is importable when running from backend/api
-_auth_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "auth"))
-if _auth_dir not in sys.path:
-    sys.path.insert(0, _auth_dir)
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,34 +5,16 @@ from sqlalchemy import select
 
 from database import get_db
 from models.user import User
-
-# auth package lives in backend/auth/
-import importlib.util as _ilu
-
-def _import_auth_module(name: str):
-    spec = _ilu.spec_from_file_location(
-        name,
-        os.path.join(_auth_dir, f"{name}.py"),
-    )
-    mod = _ilu.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
-    return mod
-
-_auth = _import_auth_module("auth")
-_schemas = _import_auth_module("schemas")
-
-hash_password = _auth.hash_password
-verify_password = _auth.verify_password
-create_access_token = _auth.create_access_token
-get_current_user = _auth.get_current_user
-build_google_auth_url = _auth.build_google_auth_url
-exchange_google_code = _auth.exchange_google_code
-get_or_create_google_user = _auth.get_or_create_google_user
-
-UserCreate = _schemas.UserCreate
-UserLogin = _schemas.UserLogin
-Token = _schemas.Token
-UserResponse = _schemas.UserResponse
+from auth.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+    build_google_auth_url,
+    exchange_google_code,
+    get_or_create_google_user,
+)
+from auth.schemas import UserCreate, UserLogin, Token, UserResponse
 
 router = APIRouter()
 

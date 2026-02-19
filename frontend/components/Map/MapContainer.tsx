@@ -84,19 +84,25 @@ export default function MapContainer({ activeLayers }: Props) {
   // Lazy-load GeoJSON when layer is toggled on
   useEffect(() => {
     if (activeLayers.economy && !economyData) {
-      fetchGeoJSON('/economy/contracts/geojson').then(setEconomyData).catch(console.error);
+      fetchGeoJSON('/economy/contracts/geojson').then(setEconomyData).catch((err) => {
+        console.error('Failed to load economy layer:', err);
+      });
     }
   }, [activeLayers.economy, economyData]);
 
   useEffect(() => {
     if (activeLayers.politics && !politicsData) {
-      fetchGeoJSON('/politics/elections/geojson').then(setPoliticsData).catch(console.error);
+      fetchGeoJSON('/politics/elections/geojson').then(setPoliticsData).catch((err) => {
+        console.error('Failed to load politics layer:', err);
+      });
     }
   }, [activeLayers.politics, politicsData]);
 
   useEffect(() => {
     if (activeLayers.environment && !environmentData) {
-      fetchGeoJSON('/environment/deforestation').then(setEnvironmentData).catch(console.error);
+      fetchGeoJSON('/environment/deforestation').then(setEnvironmentData).catch((err) => {
+        console.error('Failed to load environment layer:', err);
+      });
     }
   }, [activeLayers.environment, environmentData]);
 

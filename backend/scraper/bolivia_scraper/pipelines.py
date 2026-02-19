@@ -123,7 +123,12 @@ class DatabasePipeline:
                     INSERT INTO election_results
                         (year, election_type, party, candidate, votes, percentage, source, last_updated)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT DO NOTHING
+                    ON CONFLICT (year, election_type, party, candidate)
+                    DO UPDATE SET
+                        votes        = EXCLUDED.votes,
+                        percentage   = EXCLUDED.percentage,
+                        source       = EXCLUDED.source,
+                        last_updated = EXCLUDED.last_updated
                     """,
                     (
                         item.get("year"),

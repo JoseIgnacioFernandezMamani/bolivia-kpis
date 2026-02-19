@@ -37,7 +37,8 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db() -> None:
-    """Create all tables (only for development; use Alembic migrations in prod)."""
+    """Create all tables (development only – use the SQL migration files in
+    database/migrations/ for production deployments)."""
     from models import base  # noqa: F401 – registers all models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

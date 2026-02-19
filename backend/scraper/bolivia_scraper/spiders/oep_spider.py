@@ -4,7 +4,7 @@ Uses Playwright to handle JavaScript-rendered pages.
 """
 import re
 from datetime import datetime, timezone
-from typing import Generator
+from typing import Generator, Optional
 
 import scrapy
 from scrapy_playwright.page import PageMethod
@@ -213,7 +213,7 @@ class OEPElectionsSpider(scrapy.Spider):
             yield item
 
     @staticmethod
-    def _extract_year(text: str) -> int | None:
+    def _extract_year(text: str) -> Optional[int]:
         m = re.search(r"\b(19|20)(\d{2})\b", text)
         if m:
             return int(m.group(0))

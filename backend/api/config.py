@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # JWT
-    JWT_SECRET_KEY: str = "change-me"
+    JWT_SECRET_KEY: str  # required – no default; must be set in .env
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 

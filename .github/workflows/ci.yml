@@ -82,7 +82,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci --prefer-offline
+        run: npm ci
 
       - name: Type check
         working-directory: frontend
