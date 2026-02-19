@@ -72,12 +72,12 @@ jobs:
       - name: Run all spiders
         if: github.event.inputs.spider == ''
         working-directory: backend/scraper
-        run: scrapy crawl oep_elections
+        run: python -m bolivia_scraper
 
       - name: Run specific spider
         if: github.event.inputs.spider != ''
         working-directory: backend/scraper
-        run: scrapy crawl ${{ github.event.inputs.spider }}
+        run: python -m bolivia_scraper ${{ github.event.inputs.spider }}
 
       - name: Upload raw data artifact
         uses: actions/upload-artifact@v4

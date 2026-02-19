@@ -1,124 +1,99 @@
-"""Scrapy item pipelines."""
+"""Item pipelines – no Scrapy dependency."""
 import hashlib
 import json
-import os
 import logging
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import redis as redis_lib
 import psycopg2
-from scrapy import Spider
-from scrapy.exceptions import DropItem
+
+from bolivia_scraper import settings
+from bolivia_scraper.items import ElectionResultItem
 
 logger = logging.getLogger(__name__)
 
 
-def _item_hash(item: dict) -> str:
-    """Return SHA-256 hex digest of deterministic JSON representation."""
-    canonical = json.dumps(item, sort_keys=True, default=str)
+class DropItem(Exception):
+    """Raised by a pipeline to signal the item should not be processed further."""
+
+
+def _item_hash(item: Any) -> str:
+    """Return SHA-256 hex digest of a deterministic JSON representation."""
+    d = asdict(item) if hasattr(item, "__dataclass_fields__") else dict(item)
+    d.pop("scraped_at", None)
+    canonical = json.dumps(d, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 class HashCheckPipeline:
-    """Drop items whose content hash has not changed since last run."""
+    """Drop items whose content hash has not changed since the last run."""
 
-    def __init__(self, redis_url: str):
-        self.redis_url = redis_url
-        self.redis: redis_lib.Redis | None = None
-
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(redis_url=crawler.settings.get("REDIS_URL", "redis://localhost:6379/0"))
-
-    def open_spider(self, spider: Spider):
+    def __init__(self) -> None:
+        self._redis: redis_lib.Redis | None = None
         try:
-            self.redis = redis_lib.from_url(self.redis_url, decode_responses=True)
-            self.redis.ping()
+            self._redis = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            self._redis.ping()
         except Exception as exc:
             logger.warning("Redis unavailable – hash check disabled: %s", exc)
-            self.redis = None
+            self._redis = None
 
-    def process_item(self, item: Any, spider: Spider):
-        if self.redis is None:
+    def process(self, spider_name: str, item: Any) -> Any:
+        if self._redis is None:
             return item
 
-        d = dict(item)
-        d.pop("scraped_at", None)
-        key = f"hash:{spider.name}:{_item_hash(d)}"
+        key = f"hash:{spider_name}:{_item_hash(item)}"
+        if self._redis.get(key):
+            raise DropItem(f"Unchanged item – skipping")
 
-        if self.redis.get(key):
-            raise DropItem(f"Unchanged item – skipping: {d.get('sicoes_id') or d.get('title', '')}")
-
-        self.redis.set(key, "1", ex=60 * 60 * 24 * 30)  # expire after 30 days
+        self._redis.set(key, "1", ex=settings.HASH_TTL_SECONDS)
         return item
 
 
 class JsonExportPipeline:
     """Append each item to a JSONL file under data/raw/<spider_name>.jsonl"""
 
-    def __init__(self, raw_dir: str):
-        self.raw_dir = Path(raw_dir)
+    def __init__(self) -> None:
+        self._raw_dir = Path(settings.DATA_RAW_DIR)
+        self._raw_dir.mkdir(parents=True, exist_ok=True)
         self._handles: dict[str, Any] = {}
 
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(raw_dir=crawler.settings.get("DATA_RAW_DIR", "data/raw"))
+    def process(self, spider_name: str, item: Any) -> Any:
+        if spider_name not in self._handles:
+            path = self._raw_dir / f"{spider_name}.jsonl"
+            self._handles[spider_name] = open(path, "a", encoding="utf-8")
+        d = asdict(item) if hasattr(item, "__dataclass_fields__") else dict(item)
+        self._handles[spider_name].write(json.dumps(d, default=str) + "\n")
+        return item
 
-    def open_spider(self, spider: Spider):
-        self.raw_dir.mkdir(parents=True, exist_ok=True)
-
-    def close_spider(self, spider: Spider):
+    def close(self) -> None:
         for fh in self._handles.values():
             fh.close()
-
-    def process_item(self, item: Any, spider: Spider):
-        key = spider.name
-        if key not in self._handles:
-            path = self.raw_dir / f"{key}.jsonl"
-            self._handles[key] = open(path, "a", encoding="utf-8")
-        line = json.dumps(dict(item), default=str)
-        self._handles[key].write(line + "\n")
-        return item
+        self._handles.clear()
 
 
 class DatabasePipeline:
     """Upsert election results into PostgreSQL."""
 
-    def __init__(self, db_url: str):
-        self.db_url = db_url
-        self.conn = None
-        self.cur = None
-
-    @classmethod
-    def from_crawler(cls, crawler):
-        db_url = os.getenv("DATABASE_SYNC_URL", "postgresql://bolivia:bolivia@localhost:5432/bolivia_kpis")
-        return cls(db_url=db_url)
-
-    def open_spider(self, spider: Spider):
+    def __init__(self) -> None:
+        self._conn: psycopg2.extensions.connection | None = None
+        self._cur: psycopg2.extensions.cursor | None = None
         try:
-            self.conn = psycopg2.connect(self.db_url)
-            self.cur = self.conn.cursor()
+            self._conn = psycopg2.connect(settings.DATABASE_SYNC_URL)
+            self._cur = self._conn.cursor()
         except Exception as exc:
             logger.warning("DB connection failed – DB pipeline disabled: %s", exc)
-            self.conn = None
+            self._conn = None
 
-    def close_spider(self, spider: Spider):
-        if self.conn:
-            self.conn.commit()
-            self.cur.close()
-            self.conn.close()
-
-    def process_item(self, item: Any, spider: Spider):
-        if self.conn is None:
+    def process(self, spider_name: str, item: Any) -> Any:
+        if self._conn is None:
             return item
-
-        from bolivia_scraper.items import ElectionResultItem
 
         if isinstance(item, ElectionResultItem):
             try:
-                self.cur.execute(
+                self._cur.execute(
                     """
                     INSERT INTO election_results
                         (year, election_type, party, candidate, votes, percentage, source, last_updated)
@@ -131,19 +106,49 @@ class DatabasePipeline:
                         last_updated = EXCLUDED.last_updated
                     """,
                     (
-                        item.get("year"),
-                        item.get("election_type"),
-                        item.get("party") or "",
-                        item.get("candidate") or "",
-                        item.get("votes"),
-                        item.get("percentage"),
-                        item.get("source_url"),
+                        item.year,
+                        item.election_type,
+                        item.party or "",
+                        item.candidate or "",
+                        item.votes,
+                        item.percentage,
+                        item.source_url,
                         datetime.now(timezone.utc),
                     ),
                 )
-                self.conn.commit()
+                self._conn.commit()
             except Exception as exc:
                 logger.error("DB insert error: %s", exc)
-                self.conn.rollback()
+                self._conn.rollback()
 
         return item
+
+    def close(self) -> None:
+        if self._conn:
+            self._conn.commit()
+            if self._cur:
+                self._cur.close()
+            self._conn.close()
+
+
+def run_pipelines(spider_name: str, items: list[Any]) -> int:
+    """Run all pipelines over a list of items. Returns count of persisted items."""
+    hash_pipe = HashCheckPipeline()
+    json_pipe = JsonExportPipeline()
+    db_pipe = DatabasePipeline()
+
+    saved = 0
+    for item in items:
+        try:
+            item = hash_pipe.process(spider_name, item)
+            item = json_pipe.process(spider_name, item)
+            item = db_pipe.process(spider_name, item)
+            saved += 1
+        except DropItem:
+            pass
+        except Exception as exc:
+            logger.error("Pipeline error for %s: %s", spider_name, exc)
+
+    json_pipe.close()
+    db_pipe.close()
+    return saved
