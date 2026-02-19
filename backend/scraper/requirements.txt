@@ -1,3 +1,6 @@
+# NOTE: scrapy 2.11.2 has a known DoS vulnerability (GHSA-xxxx) with no patched
+# version available as of 2026-02-19 (affects >= 0.7, <= 2.14.1).
+# Monitor https://github.com/advisories for a patch and upgrade when released.
 scrapy==2.11.2
 playwright==1.44.0
 scrapy-playwright==0.0.34
