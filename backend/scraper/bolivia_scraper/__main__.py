@@ -1,4 +1,4 @@
-"""Entry point: python -m bolivia_scraper [spider_name]
+"""Entry point for Crawlee-based scraper: python -m bolivia_scraper [spider_name]
 
 Usage:
     python -m bolivia_scraper              # run all spiders
@@ -7,9 +7,13 @@ Usage:
 import asyncio
 import logging
 import sys
+import os
 
 from bolivia_scraper import settings
 from bolivia_scraper.pipelines import run_pipelines
+
+# Set Crawlee storage directory
+os.environ["CRAWLEE_STORAGE_DIR"] = settings.CRAWLEE_STORAGE_DIR
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
@@ -17,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Registry: spider name → coroutine factory
+# Registry: spider name → spider class
 _SPIDERS: dict[str, type] = {}
 
 try:

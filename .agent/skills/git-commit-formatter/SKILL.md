@@ -31,4 +31,4 @@ When writing a git commit message, you MUST follow the Conventional Commits spec
 
 ## Example
 
-`feat(auth): implement login with google`
+`feat: implement login with google`

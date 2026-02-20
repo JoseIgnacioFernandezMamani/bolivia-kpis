@@ -1,4 +1,4 @@
-"""Item pipelines – no Scrapy dependency."""
+"""Item pipelines for Crawlee-based scraper."""
 import hashlib
 import json
 import logging

@@ -1,4 +1,4 @@
-"""Data item definitions using plain dataclasses (no Scrapy dependency)."""
+"""Data item definitions using dataclasses for Crawlee scraper."""
 from dataclasses import dataclass, field
 from typing import Optional
 

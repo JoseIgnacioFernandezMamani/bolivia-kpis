@@ -1,19 +1,14 @@
 """
-Standalone async spider for OEP (Órgano Electoral Plurinacional) election results.
-Uses Playwright directly – no Scrapy dependency.
+OEP (Órgano Electoral Plurinacional) election results spider using Crawlee.
 """
-import asyncio
 import logging
 import re
-import time
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urljoin, urlparse
-from urllib.robotparser import RobotFileParser
+from urllib.parse import urljoin
 
-import httpx
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright, Browser, Page
+from crawlee.playwright_crawler import PlaywrightCrawler, PlaywrightCrawlingContext
 
 from bolivia_scraper import settings
 from bolivia_scraper.items import ElectionResultItem
@@ -140,144 +135,129 @@ def _parse_results_table(
     return items
 
 
-def _is_allowed(url: str, user_agent: str) -> bool:
-    """Check robots.txt for the given URL."""
-    parsed = urlparse(url)
-    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-    rp = RobotFileParser()
-    rp.set_url(robots_url)
-    try:
-        rp.read()
-    except Exception:
-        return True  # assume allowed on fetch failure
-    return rp.can_fetch(user_agent, url)
-
-
-async def _fetch_with_playwright(
-    browser: Browser,
-    url: str,
-    user_agent: str,
-    navigation_timeout: int,
-) -> str:
-    """Load a URL in a new browser page and return fully-rendered HTML."""
-    context = await browser.new_context(user_agent=user_agent)
-    page: Page = await context.new_page()
-    try:
-        await page.goto(url, wait_until="networkidle", timeout=navigation_timeout)
-        await page.wait_for_timeout(1500)
-
-        # Expand any collapsible sections
-        for selector in ["button.accordion", ".tab-link", "[data-toggle='collapse']"]:
-            try:
-                buttons = await page.query_selector_all(selector)
-                for btn in buttons:
-                    try:
-                        await btn.click()
-                        await page.wait_for_timeout(300)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-        return await page.content()
-    finally:
-        await page.close()
-        await context.close()
-
-
 class OEPElectionsSpider:
-    """Async spider that crawls OEP election-results pages."""
+    """Crawlee-based spider for OEP election results."""
 
     name = NAME
 
     def __init__(self) -> None:
-        self._visited: set[str] = set()
+        self.results: list[ElectionResultItem] = []
+        self._visited_election_pages: set[str] = set()
 
     async def run(self) -> list[ElectionResultItem]:
-        results: list[ElectionResultItem] = []
+        """Run the crawler and return scraped items."""
+        crawler = PlaywrightCrawler(
+            max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL or None,
+            max_request_retries=settings.MAX_REQUEST_RETRIES,
+            max_concurrency=settings.MAX_CONCURRENCY,
+            min_concurrency=settings.MIN_CONCURRENCY,
+            request_handler_timeout_secs=settings.REQUEST_HANDLER_TIMEOUT_SECS,
+            headless=settings.HEADLESS,
+            browser_type=settings.BROWSER_TYPE,
+        )
 
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=settings.PLAYWRIGHT_HEADLESS)
-            try:
-                for start_url in START_URLS:
-                    if not settings.OBEY_ROBOTS_TXT or _is_allowed(start_url, settings.USER_AGENT):
-                        index_items = await self._crawl_index(browser, start_url)
-                        results.extend(index_items)
-            finally:
-                await browser.close()
+        @crawler.router.default_handler
+        async def handle_index(context: PlaywrightCrawlingContext) -> None:
+            """Handle index pages and discover election event links."""
+            await context.page.wait_for_load_state("networkidle")
+            await context.page.wait_for_timeout(1500)
 
-        logger.info("OEP spider finished – %d items scraped", len(results))
-        return results
+            # Expand collapsible sections
+            for selector in ["button.accordion", ".tab-link", "[data-toggle='collapse']"]:
+                buttons = await context.page.query_selector_all(selector)
+                for btn in buttons:
+                    try:
+                        await btn.click()
+                        await context.page.wait_for_timeout(300)
+                    except Exception:
+                        pass
 
-    async def _crawl_index(self, browser: Browser, url: str) -> list[ElectionResultItem]:
-        """Fetch an index page and follow election-event links."""
-        logger.info("Fetching index: %s", url)
-        try:
-            html = await _fetch_with_playwright(
-                browser, url, settings.USER_AGENT, settings.NAVIGATION_TIMEOUT_MS
-            )
-        except Exception as exc:
-            logger.error("Failed to load index %s: %s", url, exc)
-            return []
+            html = await context.page.content()
+            soup = BeautifulSoup(html, "lxml")
 
-        soup = BeautifulSoup(html, "lxml")
-        items: list[ElectionResultItem] = []
+            logger.info(f"Processing index: {context.request.url}")
 
-        for a in soup.find_all("a", href=True):
-            href: str = a["href"]
-            text: str = a.get_text(strip=True)
-            combined = href + " " + text
+            # Find election event links
+            links_added = 0
+            for a in soup.find_all("a", href=True):
+                href: str = a["href"]
+                text: str = a.get_text(strip=True)
+                combined = href + " " + text
 
-            if not (re.search(r"\b(19|20)\d{2}\b", href) or re.search(r"\b(19|20)\d{2}\b", text)):
-                continue
+                # Only follow links that mention years
+                if not (re.search(r"\b(19|20)\d{2}\b", href) or re.search(r"\b(19|20)\d{2}\b", text)):
+                    continue
 
-            full_url = urljoin(url, href)
-            if full_url in self._visited:
-                continue
-            if settings.OBEY_ROBOTS_TXT and not _is_allowed(full_url, settings.USER_AGENT):
-                continue
+                full_url = urljoin(str(context.request.url), href)
+                
+                if full_url not in self._visited_election_pages:
+                    self._visited_election_pages.add(full_url)
+                    election_type = _classify_election_type(combined)
+                    
+                    # Enqueue for election page handler
+                    await context.add_requests([
+                        {
+                            "url": full_url,
+                            "label": "election_page",
+                            "user_data": {"election_type": election_type},
+                        }
+                    ])
+                    links_added += 1
 
-            self._visited.add(full_url)
-            election_type = _classify_election_type(combined)
+            logger.info(f"Added {links_added} election page URLs from {context.request.url}")
 
-            await asyncio.sleep(settings.DOWNLOAD_DELAY)
-            page_items = await self._crawl_election_page(browser, full_url, election_type)
-            items.extend(page_items)
+        @crawler.router.handler("election_page")
+        async def handle_election_page(context: PlaywrightCrawlingContext) -> None:
+            """Handle individual election event pages and extract tables."""
+            await context.page.wait_for_load_state("networkidle")
+            await context.page.wait_for_timeout(1500)
 
-        return items
+            # Expand collapsible sections
+            for selector in ["button.accordion", ".tab-link", "[data-toggle='collapse']"]:
+                buttons = await context.page.query_selector_all(selector)
+                for btn in buttons:
+                    try:
+                        await btn.click()
+                        await context.page.wait_for_timeout(300)
+                    except Exception:
+                        pass
 
-    async def _crawl_election_page(
-        self, browser: Browser, url: str, election_type: str
-    ) -> list[ElectionResultItem]:
-        """Fetch a single election-event page and extract all result tables."""
-        logger.info("Fetching election page: %s", url)
-        items: list[ElectionResultItem] = []
+            html = await context.page.content()
+            soup = BeautifulSoup(html, "lxml")
+            
+            url = str(context.request.url)
+            election_type = context.request.user_data.get("election_type", "general")
+            
+            logger.info(f"Processing election page: {url}")
 
-        for attempt in range(1, settings.RETRY_TIMES + 1):
-            try:
-                html = await _fetch_with_playwright(
-                    browser, url, settings.USER_AGENT, settings.NAVIGATION_TIMEOUT_MS
-                )
-                break
-            except Exception as exc:
-                logger.warning("Attempt %d/%d failed for %s: %s", attempt, settings.RETRY_TIMES, url, exc)
-                if attempt == settings.RETRY_TIMES:
-                    return []
-                await asyncio.sleep(settings.DOWNLOAD_DELAY * attempt)
+            # Extract year from URL and title
+            title_text = " ".join(t.get_text() for t in soup.find_all(["h1", "h2"]))
+            year = _extract_year(url + " " + title_text)
 
-        soup = BeautifulSoup(html, "lxml")
-        title_text = " ".join(t.get_text() for t in soup.find_all(["h1", "h2"]))
-        year = _extract_year(url + " " + title_text)
+            # Extract all tables
+            items_count = 0
+            for table in soup.find_all("table"):
+                items = _parse_results_table(str(table), year, election_type, url)
+                self.results.extend(items)
+                items_count += len(items)
 
-        for table in soup.find_all("table"):
-            items.extend(_parse_results_table(str(table), year, election_type, url))
+            logger.info(f"Extracted {items_count} items from {url}")
 
-        # Follow pagination links
-        for a in soup.find_all("a", class_=re.compile(r"next|siguiente"), href=True):
-            next_url = urljoin(url, a["href"])
-            if next_url not in self._visited:
-                self._visited.add(next_url)
-                await asyncio.sleep(settings.DOWNLOAD_DELAY)
-                items.extend(await self._crawl_election_page(browser, next_url, election_type))
+            # Follow pagination links
+            for a in soup.find_all("a", class_=re.compile(r"next|siguiente"), href=True):
+                next_url = urljoin(url, a["href"])
+                if next_url not in self._visited_election_pages:
+                    self._visited_election_pages.add(next_url)
+                    await context.add_requests([
+                        {
+                            "url": next_url,
+                            "label": "election_page",
+                            "user_data": {"election_type": election_type},
+                        }
+                    ])
 
-        return items
+        # Run the crawler
+        await crawler.run(START_URLS)
+        
+        logger.info(f"OEP spider finished – {len(self.results)} items scraped")
+        return self.results
