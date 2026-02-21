@@ -1,7 +1,7 @@
 import { GeoJsonLayer } from '@deck.gl/layers';
 import type { FeatureCollection } from 'geojson';
 
-type HoverHandler = (info: { object: unknown; x: number; y: number }) => void;
+type HoverHandler = (info: { object?: Record<string, unknown> | undefined; x: number; y: number }) => void;
 
 /** Choropleth layer for election results by department. */
 export function getPoliticsLayer(data: FeatureCollection, onHover: HoverHandler) {

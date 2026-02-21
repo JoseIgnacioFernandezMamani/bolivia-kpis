@@ -95,9 +95,9 @@ uvicorn main:app --reload --port 8000
 
 ```bash
 cd frontend
-npm ci
+pnpm install
 cp ../.env.example .env.local   # adjust NEXT_PUBLIC_* vars
-npm run dev   # http://localhost:3000
+pnpm run dev   # http://localhost:3000
 ```
 
 ### Scraper (Scrapy + Playwright)

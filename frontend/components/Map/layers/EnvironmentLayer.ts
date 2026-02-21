@@ -1,7 +1,7 @@
 import { GeoJsonLayer } from '@deck.gl/layers';
 import type { FeatureCollection } from 'geojson';
 
-type HoverHandler = (info: { object: unknown; x: number; y: number }) => void;
+type HoverHandler = (info: { object?: Record<string, unknown> | undefined; x: number; y: number }) => void;
 
 /** Layer visualising deforestation zones. */
 export function getEnvironmentLayer(data: FeatureCollection, onHover: HoverHandler) {

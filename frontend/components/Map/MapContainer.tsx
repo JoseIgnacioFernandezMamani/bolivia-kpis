@@ -4,7 +4,6 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { DeckGL } from '@deck.gl/react';
 import { MapView } from '@deck.gl/core';
-import { GeoJsonLayer } from '@deck.gl/layers';
 import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -68,7 +67,7 @@ export default function MapContainer({ activeLayers }: Props) {
       style: MAP_STYLE,
       center: [INITIAL_VIEW_STATE.longitude, INITIAL_VIEW_STATE.latitude],
       zoom: INITIAL_VIEW_STATE.zoom,
-      attributionControl: true,
+      attributionControl: undefined, // maplibregl.MapOptions requires false or object, undefined gets default
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -106,7 +105,7 @@ export default function MapContainer({ activeLayers }: Props) {
     }
   }, [activeLayers.environment, environmentData]);
 
-  const handleHover = useCallback(({ object, x, y }: { object: unknown; x: number; y: number }) => {
+  const handleHover = useCallback(({ object, x, y }: { object?: unknown; x: number; y: number }) => {
     if (object) {
       setTooltip({ object: object as Record<string, unknown>, x, y });
     } else {
@@ -138,7 +137,7 @@ export default function MapContainer({ activeLayers }: Props) {
         onViewStateChange={({ viewState: vs }) => setViewState(vs as typeof INITIAL_VIEW_STATE)}
         controller
         layers={deckLayers}
-        style={{ position: 'absolute', inset: 0 }}
+        style={{ position: 'absolute' as const, inset: '0' }}
         views={new MapView({ repeat: true })}
       />
 
