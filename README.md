@@ -163,6 +163,15 @@ Tabular endpoints return paginated JSON (`total`, `page`, `page_size`, `items`).
 | **Environment** | Deforestation zones, protected areas, mining concessions, lithium salars, CO₂, forest fires (NASA FIRMS) | ABT, SERNAP, NASA   |
 | **Security**    | Crime rates, FELCN drug seizures, road network, prisons, healthcare facilities                           | FELCN, MINJUS, SNIS |
 
+| Módulo          | Tipo de Acceso             | Link / API                                                                                                                                                                                                             |
+| --------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Economy**     | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
+| **Politics**    | Web pública (scraping)     | [https://computo.oep.org.bo/](https://computo.oep.org.bo/) [atlas electora datos](https://atlaselectoral.oep.org.bo/) [tomo pdf atlas](https://web.oep.org.bo/informacion-publica/atlas-electoral-de-bolivia-tomo-ii/) |
+| **Technology**  | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
+| **Society**     | Descarga de archivos (INE) | [https://censosbolivia.ine.gob.bo/](https://censosbolivia.ine.gob.bo/)                                                                                                                                                 |
+| **Environment** | Web pública geoespacial    | [https://ideepb.geo.gob.bo/](https://ideepb.geo.gob.bo/)                                                                                                                                                               |
+| **Security**    | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
+
 ---
 
 ## Contributing
