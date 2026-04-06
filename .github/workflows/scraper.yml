@@ -3,13 +3,13 @@ name: Scraper – Daily Run
 on:
   schedule:
     # Run every day at 04:00 UTC
-    - cron: '0 4 * * *'
+    - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
       spider:
-        description: 'Spider name to run (leave blank for all)'
+        description: "Spider name to run (leave blank for all)"
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
         image: postgis/postgis:15-3.3
         env:
           POSTGRES_USER: bolivia
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_PASSWORD: bolivia
           POSTGRES_DB: bolivia_kpis
         ports:
           - 5432:5432
@@ -47,9 +47,9 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_SYNC_URL: postgresql+psycopg2://bolivia:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/bolivia_kpis
+      DATABASE_SYNC_URL: postgresql+psycopg2://bolivia:bolivia@localhost:5432/bolivia_kpis
       REDIS_URL: redis://localhost:6379/0
-      SCRAPER_USER_AGENT: ${{ secrets.SCRAPER_USER_AGENT || 'BoliviaKPIs/1.0' }}
+      SCRAPER_USER_AGENT: ${{ secrets['SCRAPER_USER_AGENT'] || 'BoliviaKPIs/1.0' }}
 
     steps:
       - uses: actions/checkout@v4

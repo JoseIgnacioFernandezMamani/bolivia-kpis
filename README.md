@@ -95,9 +95,9 @@ uvicorn main:app --reload --port 8000
 
 ```bash
 cd frontend
-npm ci
+pnpm install
 cp ../.env.example .env.local   # adjust NEXT_PUBLIC_* vars
-npm run dev   # http://localhost:3000
+pnpm run dev   # http://localhost:3000
 ```
 
 ### Scraper (Scrapy + Playwright)
@@ -162,6 +162,15 @@ Tabular endpoints return paginated JSON (`total`, `page`, `page_size`, `items`).
 | **Society**     | HDI by municipality, life expectancy, nutrition, census data, gender gap, basic services                 | UDAPE, INE, WEF     |
 | **Environment** | Deforestation zones, protected areas, mining concessions, lithium salars, CO₂, forest fires (NASA FIRMS) | ABT, SERNAP, NASA   |
 | **Security**    | Crime rates, FELCN drug seizures, road network, prisons, healthcare facilities                           | FELCN, MINJUS, SNIS |
+
+| Módulo          | Tipo de Acceso             | Link / API                                                                                                                                                                                                             |
+| --------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Economy**     | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
+| **Politics**    | Web pública (scraping)     | [https://computo.oep.org.bo/](https://computo.oep.org.bo/) [atlas electora datos](https://atlaselectoral.oep.org.bo/) [tomo pdf atlas](https://web.oep.org.bo/informacion-publica/atlas-electoral-de-bolivia-tomo-ii/) |
+| **Technology**  | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
+| **Society**     | Descarga de archivos (INE) | [https://censosbolivia.ine.gob.bo/](https://censosbolivia.ine.gob.bo/)                                                                                                                                                 |
+| **Environment** | Web pública geoespacial    | [https://ideepb.geo.gob.bo/](https://ideepb.geo.gob.bo/)                                                                                                                                                               |
+| **Security**    | API pública CKAN           | [https://datos.gob.bo/api/3](https://datos.gob.bo/api/3)                                                                                                                                                               |
 
 ---
 
