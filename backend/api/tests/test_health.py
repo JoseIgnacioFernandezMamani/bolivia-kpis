@@ -12,8 +12,13 @@ def anyio_backend():
 async def client():
     # Import here to avoid DB connection at module load
     from main import app
+    from database import init_db, engine
+    await init_db()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
+    
+    # Dispose connection pool so next test gets a new bound event loop
+    await engine.dispose()
 
 
 @pytest.mark.anyio
